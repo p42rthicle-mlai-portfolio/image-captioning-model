@@ -175,3 +175,75 @@ features = extract_features(dataset_images)
 dump(features, open("features.p", "wb"))
 
 # run and dump the features now
+
+features = load(open("features.p", "rb"))
+
+
+# load the photos data
+def load_photos(filename):
+    file = load_doc(filename)
+    photos = file.split("\n")[:-1]
+    photos_present = [
+        photo for photo in photos if os.path.exists(os.path.join(dataset_images, photo))
+    ]
+    return photos_present
+
+
+# loading clean_descriptions
+def load_clean_descriptions(filename, photos):
+    file = load_doc(filename)
+    descriptions = {}
+    for line in file.split("\n"):
+        words = line.split()
+        if len(words) < 1:
+            continue
+
+        image, image_caption = words[0], words[1:]
+
+        if image in photos:
+            if image not in descriptions:
+                descriptions[image] = []
+                # start and end token so its able to make prediction well
+            desc = "<start> " + " ".join(image_caption) + " <end>"
+            descriptions[image].append(desc)
+
+    return descriptions
+
+
+# loading all features
+def load_features(photos):
+    all_features = load(open("features.p", "rb"))
+    # selecting only needed features
+    features = {k: all_features[k] for k in photos}
+    return features
+
+
+filename = dataset_text + "/" + "Flickr_8k.trainImages.txt"
+
+# train = loading_data(filename)
+train_imgs = load_photos(filename)
+train_descriptions = load_clean_descriptions("descriptions.txt", train_imgs)
+train_features = load_features(train_imgs)
+
+
+# converting dictionary to clean list of descriptions
+def dict_to_list(descriptions):
+    all_desc = []
+    for key in descriptions.keys():
+        [all_desc.append(d) for d in descriptions[key]]
+    return all_desc
+
+
+# creating tokenizer class
+# this will vectorise text corpus
+# each integer will represent token in dictionary
+def create_tokenizer(descriptions):
+    desc_list = dict_to_list(descriptions)
+    tokenizer = Tokenizer()
+    tokenizer.fit_on_texts(desc_list)
+    return tokenizer
+
+
+# give each word an index, and store that into tokenizer.p pickle file
+tokenizer = create_tokenizer(train_descriptions)
+dump(tokenizer, open("tokenizer.p", "wb"))
