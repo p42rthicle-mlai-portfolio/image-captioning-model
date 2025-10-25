@@ -124,3 +124,54 @@ print("Length of vocabulary = ", len(vocabulary))
 save_descriptions(clean_descriptions, "descriptions.txt")
 
 # Run the file to get descriptions.txt file
+
+
+# download model with retry
+def download_with_retry(url, filename, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            return get_file(filename, url)
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise e
+            print(f"Download attempt {attempt + 1} failed. Retrying in 5 seconds...")
+            time.sleep(5)
+
+
+# # Replace the Xception model initialization with:
+weights_url = "https://storage.googleapis.com/tensorflow/keras-applications/xception/xception_weights_tf_dim_ordering_tf_kernels_notop.h5"
+weights_path = download_with_retry(weights_url, "xception_weights.h5")
+# excluding last layer to not get the caption but till the fully connected layer second to last
+model = Xception(include_top=False, pooling="avg", weights=weights_path)
+
+
+def extract_features(directory):
+    features = {}
+    valid_images = [".jpg", ".jpeg", ".png"]  # Add other formats if needed
+
+    # shows progress bar for each loop
+    for img in tqdm(os.listdir(directory)):
+        # Skip files that don't end with valid image extensions
+        ext = os.path.splitext(img)[1].lower()
+        if ext not in valid_images:
+            continue
+
+        filename = directory + "/" + img
+        image = Image.open(filename)
+        image = image.resize((299, 299))  # Xception model accepts files of this size
+        image = np.expand_dims(
+            image, axis=0
+        )  # to send images to neural network in batches
+        image = image / 127.5  # pixel values are  0-255
+        image = image - 1.0  # values now become -1 to 1
+
+        feature = model.predict(image)
+        features[img] = feature
+    return features
+
+
+# 2048 feature vector
+features = extract_features(dataset_images)
+dump(features, open("features.p", "wb"))
+
+# run and dump the features now
